@@ -14,11 +14,11 @@
 
 // GPL required for class_create/device_create/etc.
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Marek");
+MODULE_AUTHOR("Marek Felsoci");
 MODULE_DESCRIPTION("fifo");
-MODULE_VERSION("0.0.1");
+MODULE_VERSION("1.0");
 
-// functions pre-declaration
+// Function pre-declarations
 int m_open(struct inode * inode, struct file * filp);
 int m_release(struct inode * inode, struct file * filp);
 ssize_t m_read(struct file * filp, char * buf, size_t count, loff_t * f_pos);
@@ -35,7 +35,7 @@ struct file_operations fops = {
   .release = m_release
 };
 
-// Declaration of the module init and exit functions
+// Declaration of the module initialization and exit functions
 module_init(m_init);
 module_exit(m_exit);
 
@@ -50,46 +50,51 @@ static int m_debut, m_fin;
 
 #define BUF_SIZE 256
 
+// Declaration of waiting queues
 DECLARE_WAIT_QUEUE_HEAD(WrWaitQ);
 DECLARE_WAIT_QUEUE_HEAD(RdWaitQ);
 
+// Function called when the module is loaded to the system
 int m_init(void) {
-  // a major number will be dynamically allocated here
+  // New character device definition
+  // - a major number will be dynamically allocated here
   m_major = register_chrdev(0, "fifo", &fops);
 
   if(m_major < 0) {
-    printk(KERN_ALERT "FIFO: Error in allocating device\n");
+    printk(KERN_ALERT "FIFO: Error registering new device!\n");
     return -1;    
   }
   
   printk(KERN_INFO "FIFO: Kernel assigned major number is %d.\n", m_major);
 
-  // add the driver class to /sys/class/fifodrv
+  // Creating device class
+  // - add the driver class to /sys/class/fifodrv
   if((basicDriverClass = class_create(THIS_MODULE, "fifodrv")) == NULL) {
-    printk(KERN_ALERT "FIFO: Error in creating device class\n");
+    printk(KERN_ALERT "FIFO: Error creating device class '/sys/class/fifodrv'!\n");
     goto fail1;
   }
 
-  // add the driver file to /dev/fifo -- here
+  // Creating device itself
+  // - add the driver file to /dev/fifo -- here
   if(device_create(basicDriverClass, NULL, MKDEV(m_major,0), NULL, "fifo") == NULL) {
-    printk(KERN_ALERT "FIFO: Error in creating device /dev/fifo\n");
+    printk(KERN_ALERT "FIFO: Error creating device '/dev/fifo'!\n");
     goto fail2;
   }
 
-  // memory for the buffer
+  // Alocate memory for the device's buffer
   m_buffer = kmalloc(BUF_SIZE, GFP_KERNEL); 
   if(!m_buffer) {
-    printk(KERN_ALERT "registering fifo: cannot allocate memory\n");
+    printk(KERN_ALERT "FIFO: Memory allocation for the device buffer failed!\n");
     goto fail3;
   }
 
   m_debut = 0;
   m_fin = 0;
-  printk(KERN_INFO "FIFO: driver created successfully, device is /dev/fifo.\n");
+  printk(KERN_INFO "FIFO: Device driver created successfully, device is /dev/fifo.\n");
 
   return(0);
   
-  // errors: free the allocated resources in case of failure!
+  // Error handling: free the allocated resources in case of failure!
   fail3:
     device_destroy(basicDriverClass, MKDEV(m_major, 0));
 
@@ -102,6 +107,7 @@ int m_init(void) {
   return(-ENOMEM);
 }
 
+// Destroys the device and frees the memory used.
 void m_exit(void) {
   device_destroy(basicDriverClass, MKDEV(m_major, 0));
   class_destroy(basicDriverClass);
@@ -109,6 +115,7 @@ void m_exit(void) {
   kfree(m_buffer);
 }
 
+// Prepares the device for a new writer.
 int m_open(struct inode * inode, struct file * filp) {
   try_module_get(THIS_MODULE);
   if(filp->f_mode & FMODE_WRITE) {
@@ -117,6 +124,7 @@ int m_open(struct inode * inode, struct file * filp) {
   return 0;
 }
 
+// Detaches a registered writer from the device.
 int m_release(struct inode * inode, struct file * filp) {
   module_put(THIS_MODULE);
   if(filp->f_mode & FMODE_WRITE) {
@@ -125,6 +133,7 @@ int m_release(struct inode * inode, struct file * filp) {
   return 0;
 }
 
+// Circuralry reads characters from the device and sends it to the target file until the buffer becomes empty, then waits until there are new characters in the buffer or exists if there is no more characters and no more attached writers.
 ssize_t m_read(struct file * filp, char * buf, size_t count, loff_t * f_pos) {
   int left = m_fin - m_debut;
   
@@ -147,6 +156,7 @@ ssize_t m_read(struct file * filp, char * buf, size_t count, loff_t * f_pos) {
   return 1;
 }
 
+// Reads characters from the input file and writes them to the buffer until it becomes full, then waits until the 'm_read' function reads the characters from the buffer and continues till the end of the input. 
 ssize_t m_write(struct file * filp, const char * buf, size_t count, loff_t * f_pos) {
   while(m_debut == (m_fin + 1) % BUF_SIZE) {
     // buffer plein... attendre que quelqu'un lise le buffer

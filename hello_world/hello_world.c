@@ -2,16 +2,19 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-MODULE_LICENSE("WTF-tp1");
+// Specify module information
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marek Felsoci");
 MODULE_DESCRIPTION("Hello world!");
-MODULE_VERSION("1");
+MODULE_VERSION("1.0");
 
+// Function called on module initialization (when the module is loaded)
 static int hello_init(void) {
   printk(KERN_INFO "Hello world!\n");
   return 0;
 }
 
+// Function called when the module is unloaded from the system
 static void hello_exit(void) {
   printk(KERN_INFO "Bye, cruel world\n");
 }
