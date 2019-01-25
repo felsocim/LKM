@@ -26,7 +26,7 @@ ssize_t m_write(struct file * filp, const char * buf, size_t count, loff_t * f_p
 void m_exit(void);
 int m_init(void);
 
-// Structure that declares the usual file access functions
+// Structure that declares the usual device file access functions
 struct file_operations fops = {
   .owner = THIS_MODULE,
   .read = m_read,
@@ -56,7 +56,7 @@ DECLARE_WAIT_QUEUE_HEAD(RdWaitQ);
 
 // Function called when the module is loaded to the system
 int m_init(void) {
-  // New character device definition
+  // New device definition
   // - a major number will be dynamically allocated here
   m_major = register_chrdev(0, "fifo", &fops);
 
@@ -67,15 +67,14 @@ int m_init(void) {
   
   printk(KERN_INFO "FIFO: Kernel assigned major number is %d.\n", m_major);
 
-  // Creating device class
+  // Creating device's driver class
   // - add the driver class to /sys/class/fifodrv
   if((basicDriverClass = class_create(THIS_MODULE, "fifodrv")) == NULL) {
     printk(KERN_ALERT "FIFO: Error creating device class '/sys/class/fifodrv'!\n");
     goto fail1;
   }
 
-  // Creating device itself
-  // - add the driver file to /dev/fifo -- here
+  // Adding the device's driver file to /dev/fifo
   if(device_create(basicDriverClass, NULL, MKDEV(m_major,0), NULL, "fifo") == NULL) {
     printk(KERN_ALERT "FIFO: Error creating device '/dev/fifo'!\n");
     goto fail2;
@@ -88,8 +87,10 @@ int m_init(void) {
     goto fail3;
   }
 
+  // Initialize buffer's start and end positions to 0
   m_debut = 0;
   m_fin = 0;
+  
   printk(KERN_INFO "FIFO: Device driver created successfully, device is /dev/fifo.\n");
 
   return(0);
@@ -133,7 +134,7 @@ int m_release(struct inode * inode, struct file * filp) {
   return 0;
 }
 
-// Circuralry reads characters from the device and sends it to the target file until the buffer becomes empty, then waits until there are new characters in the buffer or exists if there is no more characters and no more attached writers.
+// Circuralry reads characters from the device and sends it to the user until the buffer becomes empty, then waits until there are new characters in the buffer or exists if there is no more characters and no more attached writers.
 ssize_t m_read(struct file * filp, char * buf, size_t count, loff_t * f_pos) {
   int left = m_fin - m_debut;
   
@@ -156,7 +157,7 @@ ssize_t m_read(struct file * filp, char * buf, size_t count, loff_t * f_pos) {
   return 1;
 }
 
-// Reads characters from the input file and writes them to the buffer until it becomes full, then waits until the 'm_read' function reads the characters from the buffer and continues till the end of the input. 
+// Reads characters from the user and writes them to the buffer until it becomes full, then waits until the 'm_read' function reads the characters from the buffer and continues till the end of the input stream. 
 ssize_t m_write(struct file * filp, const char * buf, size_t count, loff_t * f_pos) {
   while(m_debut == (m_fin + 1) % BUF_SIZE) {
     // buffer plein... attendre que quelqu'un lise le buffer
