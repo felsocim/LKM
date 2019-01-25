@@ -62,7 +62,7 @@ Finally, read the stream of characters from the device using the **cat** command
 
 ## Author
 
-[Marek Felsoci](mailto:marek.felsoci@gmail.com) - Master degree student at the [University of Strasbourg](http://www.unistra.fr), France
+[Marek Felsoci](mailto:marek.felsoci@gmail.com) - Master's degree student at the [University of Strasbourg](http://www.unistra.fr), France
 
 ## License
 
